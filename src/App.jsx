@@ -12,19 +12,16 @@ function App() {
   const [currentRound, setCurrentRound] = useState(0)
   const [chosenSide, setChosenSide] = useState(null)
   const [placements, setPlacements] = useState([])
-  const extractTimeout = useRef(null)
-  const keepTimeout = useRef(null)
+  const timers = useRef([])
+  const clearTimers = () => { timers.current.forEach(clearTimeout); timers.current = [] }
+  const addTimer = (fn, ms) => { const id = setTimeout(fn, ms); timers.current.push(id); return id }
 
-  useEffect(() => {
-    return () => {
-      if (extractTimeout.current) clearTimeout(extractTimeout.current)
-      if (keepTimeout.current) clearTimeout(keepTimeout.current)
-    }
-  }, [])
+  useEffect(() => () => clearTimers(), [])
 
   const currentRoundData = sessionPairs[currentRound]
 
   const handleCreate = () => {
+    clearTimers()
     const pairs = buildSessionPairs()
     setSessionPairs(pairs)
     setCurrentRound(0)
@@ -35,14 +32,15 @@ function App() {
 
   const handleChoice = (side) => {
     if (!currentRoundData || chosenSide) return
-    setChosenSide(side)
     const pick = side === 'A' ? currentRoundData.negPick : currentRoundData.posPick
-    // Brief pause to show the source settling, then extract
-    extractTimeout.current = setTimeout(() => {
+    if (!pick || !pick.phrase) return
+    setChosenSide(side)
+    const round = currentRound
+    addTimer(() => {
       setPhase('extracting')
-      setTimeout(() => {
+      addTimer(() => {
         setPlacements(prev => placeFragment(prev, pick.phrase.text))
-        if (currentRound < TOTAL_ROUNDS - 1) {
+        if (round < TOTAL_ROUNDS - 1) {
           setCurrentRound(r => r + 1)
           setChosenSide(null)
           setPhase('reading')
@@ -55,7 +53,8 @@ function App() {
 
   const handleKeep = () => {
     setPhase('kept')
-    keepTimeout.current = setTimeout(() => {
+    addTimer(() => {
+      clearTimers()
       setPlacements([])
       setSessionPairs([])
       setCurrentRound(0)

@@ -45,7 +45,6 @@ function CharBlock({ char, x, z, isNew, delay = 0 }) {
         color={isNew ? '#fff' : '#ddd'}
         anchorX="center"
         anchorY="middle"
-        font="/fonts/courier.woff"
       >
         {char}
       </Text>

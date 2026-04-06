@@ -64,6 +64,8 @@ export function buildSessionPairs() {
       usedPhrases.add(posPick.phrase.text)
       usedSources.add(posPick.context.sourceFile)
     }
+    // Skip rounds where either pick is null (orphan fragments)
+    if (!negPick || !posPick) continue
     rounds.push({
       axisIndex,
       poles: axisNames[axisIndex],
