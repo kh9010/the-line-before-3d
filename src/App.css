@@ -20,8 +20,8 @@ body {
 /* 3D crossword panel — constrained box in upper portion */
 .crossword-panel {
   width: 100%;
-  max-width: 600px;
-  height: 280px;
+  max-width: 700px;
+  height: 360px;
   border-radius: 8px;
   overflow: hidden;
   margin-bottom: 1rem;

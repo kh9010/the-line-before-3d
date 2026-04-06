@@ -43,19 +43,22 @@ function FloatingChar({ char, gx, gz, isNew, delay = 0 }) {
   )
 }
 
-// Auto-rotating camera that keeps everything in frame
+// Gentle swing that spends most time in a readable front-on view,
+// occasionally drifting to show the 3D structure
 function AutoRig({ bounds }) {
   const cx = ((bounds.minX + bounds.maxX) / 2) * SPACING
   const cz = ((bounds.minY + bounds.maxY) / 2) * SPACING
   const extent = Math.max(bounds.width * SPACING, bounds.height * SPACING, 2)
-  const dist = extent * 0.9 + 1.5
+  const dist = extent * 0.75 + 2.5
 
   useFrame(({ clock, camera }) => {
-    const angle = clock.elapsedTime * 0.12
-    const targetX = cx + Math.sin(angle) * dist
-    const targetZ = cz + Math.cos(angle) * dist
-    const targetY = dist * 0.55
-    camera.position.lerp(new THREE.Vector3(targetX, targetY, targetZ), 0.025)
+    // Slow pendulum: mostly front-on, gentle drift side to side
+    const t = clock.elapsedTime * 0.1
+    const swing = Math.sin(t) * 0.6  // ±0.6 radians (~35°)
+    const targetX = cx + Math.sin(swing) * dist * 0.4
+    const targetZ = cz + dist  // stay in front
+    const targetY = dist * 0.45 + Math.sin(t * 0.7) * 0.3  // subtle height drift
+    camera.position.lerp(new THREE.Vector3(targetX, targetY, targetZ), 0.02)
     camera.lookAt(cx, 0, cz)
   })
 
