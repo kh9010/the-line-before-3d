@@ -70,7 +70,7 @@ export default function TextMorph({ contextA, contextB, chosenSide, onSettled, e
   // State in refs for rAF-driven updates
   const stateRef = useRef({
     phase: 'holdA',
-    phaseStart: 0,
+    phaseStart: -1,
     progress: 0,
     scrambleRoll: 0,
     settled: false,

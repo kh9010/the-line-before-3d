@@ -26,11 +26,11 @@ function App() {
   const handleCreate = () => {
     clearTimers()
     const pairs = buildSessionPairs()
+    if (pairs.length === 0) return
     setSessionPairs(pairs)
     setCurrentRound(0)
     setChosenSide(null)
     setLines([])
-    setPlacements([])
     setMorphKey(k => k + 1)
     setPhase('reading')
   }
@@ -52,7 +52,7 @@ function App() {
     addTimer(() => {
       setLines(prev => [...prev, { text: pick.phrase.text, id: Date.now(), mode: poleWord }])
 
-      if (round < TOTAL_ROUNDS - 1) {
+      if (round < sessionPairs.length - 1) {
         setCurrentRound(r => r + 1)
         setChosenSide(null)
         setMorphKey(k => k + 1)
