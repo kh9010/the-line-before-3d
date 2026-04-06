@@ -85,7 +85,7 @@ function App() {
       {/* 3D crossword — constrained panel, slowly spinning */}
       {inSession && placements.length > 0 && (
         <div className={`crossword-panel ${phase === 'kept' ? 'is-fading' : ''}`}>
-          <Crossword3D placements={placements} latestIndex={placements.length - 1} />
+          <Crossword3D placements={placements} latestIndex={placements.length - 1} frozen={phase === 'complete' || phase === 'kept'} />
         </div>
       )}
 
@@ -103,11 +103,29 @@ function App() {
         )}
       </div>
 
+      {/* Idle: title + invitation */}
+      {phase === 'idle' && (
+        <div className="idle-screen">
+          <h1 className="title">the line before</h1>
+          <p className="tagline">a poem is always being made from other poems</p>
+          <button className="btn-main" onClick={handleCreate}>begin</button>
+        </div>
+      )}
+
+      {/* Complete: the poem revealed */}
+      {phase === 'complete' && (
+        <div className="reveal">
+          {lines.map((line, i) => (
+            <p key={line.id} className="reveal-line" style={{ animationDelay: `${i * 0.4}s` }}>
+              {line.text.replace(/ \/ /g, '\n')}
+            </p>
+          ))}
+        </div>
+      )}
+
       {/* DOM: controls */}
       <div className="controls">
-        {phase === 'idle' && (
-          <button className="btn-main" onClick={handleCreate}>begin</button>
-        )}
+        {phase === 'idle' && null}
         {phase === 'reading' && currentRoundData && (
           <div className="choice-buttons">
             <button

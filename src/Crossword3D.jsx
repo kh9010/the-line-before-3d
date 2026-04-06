@@ -45,19 +45,24 @@ function FloatingChar({ char, gx, gz, isNew, delay = 0 }) {
 
 // Gentle swing that spends most time in a readable front-on view,
 // occasionally drifting to show the 3D structure
-function AutoRig({ bounds }) {
+function AutoRig({ bounds, frozen = false }) {
   const cx = ((bounds.minX + bounds.maxX) / 2) * SPACING
   const cz = ((bounds.minY + bounds.maxY) / 2) * SPACING
   const extent = Math.max(bounds.width * SPACING, bounds.height * SPACING, 2)
   const dist = extent * 0.75 + 2.5
 
   useFrame(({ clock, camera }) => {
-    // Slow pendulum: mostly front-on, gentle drift side to side
+    if (frozen) {
+      // Settle to a clean front-on view
+      camera.position.lerp(new THREE.Vector3(cx, dist * 0.4, cz + dist * 0.85), 0.03)
+      camera.lookAt(cx, 0, cz)
+      return
+    }
     const t = clock.elapsedTime * 0.1
-    const swing = Math.sin(t) * 0.6  // ±0.6 radians (~35°)
+    const swing = Math.sin(t) * 0.6
     const targetX = cx + Math.sin(swing) * dist * 0.4
-    const targetZ = cz + dist  // stay in front
-    const targetY = dist * 0.45 + Math.sin(t * 0.7) * 0.3  // subtle height drift
+    const targetZ = cz + dist
+    const targetY = dist * 0.45 + Math.sin(t * 0.7) * 0.3
     camera.position.lerp(new THREE.Vector3(targetX, targetY, targetZ), 0.02)
     camera.lookAt(cx, 0, cz)
   })
@@ -65,7 +70,7 @@ function AutoRig({ bounds }) {
   return null
 }
 
-function Scene({ placements, latestIndex }) {
+function Scene({ placements, latestIndex, frozen }) {
   const bounds = useMemo(() => getBounds(placements || []), [placements])
 
   if (!placements || placements.length === 0) return null
@@ -78,7 +83,7 @@ function Scene({ placements, latestIndex }) {
       <ambientLight intensity={1} />
       <directionalLight position={[3, 6, 3]} intensity={0.3} />
 
-      <AutoRig bounds={bounds} />
+      <AutoRig bounds={bounds} frozen={frozen} />
 
       <group position={[ox * SPACING, 0, oz * SPACING]}>
         {placements.map((p, pi) => {
@@ -105,11 +110,11 @@ function Scene({ placements, latestIndex }) {
   )
 }
 
-export default function Crossword3D({ placements, latestIndex }) {
+export default function Crossword3D({ placements, latestIndex, frozen = false }) {
   return (
     <div className="crossword-3d-container">
       <Canvas camera={{ position: [0, 4, 5], fov: 45 }} style={{ background: 'transparent' }}>
-        <Scene placements={placements} latestIndex={latestIndex} />
+        <Scene placements={placements} latestIndex={latestIndex} frozen={frozen} />
       </Canvas>
     </div>
   )
