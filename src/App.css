@@ -1,0 +1,141 @@
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Courier New', monospace;
+  background: #f5f0e8;
+  color: #1a1a1a;
+  overflow: hidden;
+}
+
+.app {
+  width: 100vw;
+  height: 100vh;
+  position: relative;
+}
+
+/* 3D scene */
+.scene-container {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  opacity: 0;
+  transition: opacity 1s ease;
+}
+.scene-container.is-active { opacity: 1; }
+.scene-container.is-fading { opacity: 0; transition: opacity 2.5s ease; }
+
+.crossword-3d {
+  width: 100%;
+  height: 100%;
+}
+.crossword-3d canvas {
+  display: block;
+}
+
+/* Overlay: controls + source text */
+.overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: 2rem;
+}
+
+.overlay > * { pointer-events: auto; }
+
+/* Source excerpt during reading */
+.source-excerpt {
+  position: absolute;
+  top: 2rem;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: 600px;
+  text-align: center;
+  opacity: 0.85;
+  transition: opacity 0.6s ease;
+}
+.source-excerpt.is-settling { opacity: 0.3; }
+.source-line {
+  font-size: 0.9rem;
+  line-height: 1.6;
+  color: #555;
+  margin: 0.15rem 0;
+}
+
+/* Controls */
+.controls {
+  display: flex;
+  justify-content: center;
+  gap: 1.5rem;
+  margin-bottom: 1rem;
+}
+
+.btn-main {
+  font-family: 'Courier New', monospace;
+  font-size: 1.1rem;
+  padding: 0.6rem 2rem;
+  background: transparent;
+  border: 1px solid #1a1a1a;
+  color: #1a1a1a;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+  letter-spacing: 0.1em;
+}
+.btn-main:hover { background: #1a1a1a; color: #f5f0e8; }
+
+.choice-buttons {
+  display: flex;
+  gap: 2rem;
+}
+
+.btn-axis {
+  font-family: 'Courier New', monospace;
+  font-size: 1rem;
+  padding: 0.5rem 1.6rem;
+  background: transparent;
+  border: 1px solid #888;
+  color: #555;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  letter-spacing: 0.08em;
+}
+.btn-axis:hover:not(:disabled) { border-color: #1a1a1a; color: #1a1a1a; }
+.btn-axis:disabled { opacity: 0.4; cursor: default; }
+.btn-axis.is-chosen { border-color: #1a1a1a; color: #1a1a1a; background: rgba(0,0,0,0.04); }
+
+.status-text {
+  font-size: 0.9rem;
+  color: #888;
+  letter-spacing: 0.1em;
+}
+
+/* Round dots */
+.round-indicator {
+  display: flex;
+  justify-content: center;
+  gap: 0.6rem;
+  margin-bottom: 0.5rem;
+}
+.round-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ddd;
+  transition: background 0.3s;
+}
+.round-dot.is-filled { background: #555; }
+.round-dot.is-current { background: #1a1a1a; animation: pulse-dot 1.5s ease infinite; }
+
+@keyframes pulse-dot {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.3); }
+}
+
+/* Idle state — center the begin button */
+.phase-idle .overlay {
+  justify-content: center;
+  align-items: center;
+}
