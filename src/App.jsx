@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { Canvas } from '@react-three/fiber'
 import './App.css'
-import Scene from './Scene'
+import SuperpositionText from './SuperpositionText'
+import Crossword3D from './Crossword3D'
 import { buildSessionPairs } from './pairs'
 import { placeFragment } from './crosswordLayout'
 
@@ -14,12 +14,11 @@ function App() {
   const [chosenSide, setChosenSide] = useState(null)
   const [lines, setLines] = useState([])
   const [placements, setPlacements] = useState([])
+  const [morphKey, setMorphKey] = useState(0)
   const timers = useRef([])
+
   const clearTimers = () => { timers.current.forEach(clearTimeout); timers.current = [] }
   const addTimer = (fn, ms) => { const id = setTimeout(fn, ms); timers.current.push(id); return id }
-
-  // Stable key for TextMorph remount per round
-  const [morphKey, setMorphKey] = useState(0)
 
   useEffect(() => () => clearTimers(), [])
 
@@ -38,7 +37,7 @@ function App() {
     setPhase('reading')
   }
 
-  const handleChoice = (side) => {
+  const handleChoice = (e, side) => {
     if (!currentRoundData || chosenSide) return
     const pick = side === 'A' ? currentRoundData.negPick : currentRoundData.posPick
     if (!pick || !pick.phrase) return
@@ -63,8 +62,8 @@ function App() {
       } else {
         setPhase('complete')
       }
-    }, 2000)
-  }, [currentRoundData, chosenSide, currentRound])
+    }, 2200)
+  }, [currentRoundData, chosenSide, currentRound, sessionPairs.length])
 
   const handleKeep = () => {
     setPhase('kept')
@@ -83,58 +82,66 @@ function App() {
 
   return (
     <div className={`app phase-${phase}`}>
-      {/* GPU-rendered scene */}
-      <div className={`canvas-container ${inSession ? 'is-active' : ''} ${phase === 'kept' ? 'is-fading' : ''}`}>
-        <Canvas orthographic camera={{ zoom: 100, position: [0, 0, 10] }}>
-          <Scene
+      {/* 3D crossword — constrained panel, slowly spinning */}
+      {inSession && placements.length > 0 && (
+        <div className={`crossword-panel ${phase === 'kept' ? 'is-fading' : ''}`}>
+          <Crossword3D placements={placements} latestIndex={placements.length - 1} />
+        </div>
+      )}
+
+      {/* DOM: superposition morph text */}
+      <div className="morph-zone">
+        {(phase === 'reading' || phase === 'extracting') && currentRoundData && (
+          <SuperpositionText
             key={morphKey}
-            phase={phase}
-            currentRoundData={currentRoundData}
+            contextA={currentRoundData.negPick.context}
+            contextB={currentRoundData.posPick.context}
             chosenSide={chosenSide}
-            lines={lines}
-            placements={placements}
-            filledRounds={lines.length}
             onSettled={handleSettled}
             extracting={phase === 'extracting'}
           />
-        </Canvas>
+        )}
       </div>
 
-      {/* HTML overlay for buttons */}
-      <div className="overlay">
-        <div className="controls">
-          {phase === 'idle' && (
-            <button className="btn-main" onClick={handleCreate}>begin</button>
-          )}
-          {phase === 'reading' && currentRoundData && (
-            <div className="choice-buttons">
-              <button
-                className={`btn-axis ${chosenSide === 'A' ? 'is-chosen' : ''}`}
-                onClick={() => handleChoice('A')}
-                disabled={!!chosenSide}
-              >
-                {currentRoundData.poles[0]}
-              </button>
-              <button
-                className={`btn-axis ${chosenSide === 'B' ? 'is-chosen' : ''}`}
-                onClick={() => handleChoice('B')}
-                disabled={!!chosenSide}
-              >
-                {currentRoundData.poles[1]}
-              </button>
-            </div>
-          )}
-          {phase === 'extracting' && (
-            <div className="status-text"></div>
-          )}
-          {phase === 'complete' && (
-            <button className="btn-main" onClick={handleKeep}>keep</button>
-          )}
-          {phase === 'kept' && (
-            <div className="status-text">kept</div>
-          )}
-        </div>
+      {/* DOM: controls */}
+      <div className="controls">
+        {phase === 'idle' && (
+          <button className="btn-main" onClick={handleCreate}>begin</button>
+        )}
+        {phase === 'reading' && currentRoundData && (
+          <div className="choice-buttons">
+            <button
+              className={`btn-axis ${chosenSide === 'A' ? 'is-chosen' : ''}`}
+              onClick={(e) => handleChoice(e, 'A')}
+              disabled={!!chosenSide}
+            >
+              {currentRoundData.poles[0]}
+            </button>
+            <button
+              className={`btn-axis ${chosenSide === 'B' ? 'is-chosen' : ''}`}
+              onClick={(e) => handleChoice(e, 'B')}
+              disabled={!!chosenSide}
+            >
+              {currentRoundData.poles[1]}
+            </button>
+          </div>
+        )}
+        {phase === 'complete' && (
+          <button className="btn-main" onClick={handleKeep}>keep</button>
+        )}
+        {phase === 'kept' && (
+          <span className="status-text">kept</span>
+        )}
       </div>
+
+      {/* Round dots */}
+      {inSession && phase !== 'kept' && (
+        <div className="round-indicator">
+          {Array.from({ length: Math.min(TOTAL_ROUNDS, sessionPairs.length) }, (_, i) => (
+            <span key={i} className={`round-dot ${i < lines.length ? 'is-filled' : ''} ${i === lines.length ? 'is-current' : ''}`} />
+          ))}
+        </div>
+      )}
     </div>
   )
 }
