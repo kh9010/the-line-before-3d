@@ -3,6 +3,7 @@ import { Canvas } from '@react-three/fiber'
 import './App.css'
 import Scene from './Scene'
 import { buildSessionPairs } from './pairs'
+import { placeFragment } from './crosswordLayout'
 
 const TOTAL_ROUNDS = 4
 
@@ -12,6 +13,7 @@ function App() {
   const [currentRound, setCurrentRound] = useState(0)
   const [chosenSide, setChosenSide] = useState(null)
   const [lines, setLines] = useState([])
+  const [placements, setPlacements] = useState([])
   const timers = useRef([])
   const clearTimers = () => { timers.current.forEach(clearTimeout); timers.current = [] }
   const addTimer = (fn, ms) => { const id = setTimeout(fn, ms); timers.current.push(id); return id }
@@ -31,6 +33,7 @@ function App() {
     setCurrentRound(0)
     setChosenSide(null)
     setLines([])
+    setPlacements([])
     setMorphKey(k => k + 1)
     setPhase('reading')
   }
@@ -51,7 +54,7 @@ function App() {
     setPhase('extracting')
     addTimer(() => {
       setLines(prev => [...prev, { text: pick.phrase.text, id: Date.now(), mode: poleWord }])
-
+      setPlacements(prev => placeFragment(prev, pick.phrase.text))
       if (round < sessionPairs.length - 1) {
         setCurrentRound(r => r + 1)
         setChosenSide(null)
@@ -68,6 +71,7 @@ function App() {
     addTimer(() => {
       clearTimers()
       setLines([])
+      setPlacements([])
       setSessionPairs([])
       setCurrentRound(0)
       setChosenSide(null)
@@ -88,6 +92,7 @@ function App() {
             currentRoundData={currentRoundData}
             chosenSide={chosenSide}
             lines={lines}
+            placements={placements}
             filledRounds={lines.length}
             onSettled={handleSettled}
             extracting={phase === 'extracting'}

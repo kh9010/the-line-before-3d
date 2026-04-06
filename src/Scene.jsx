@@ -1,6 +1,6 @@
-import { useMemo } from 'react'
 import { Text } from '@react-three/drei'
 import TextMorph from './TextMorph'
+import CrosswordView from './CrosswordView'
 
 // Chosen-stack lines rendered as GPU text
 function ChosenStack({ lines, y = 2.5 }) {
@@ -44,11 +44,16 @@ function RoundDots({ total, filled, y = -2.8 }) {
   )
 }
 
-export default function Scene({ phase, currentRoundData, chosenSide, lines, filledRounds = 0, onSettled, extracting }) {
+export default function Scene({ phase, currentRoundData, chosenSide, lines, placements, filledRounds = 0, onSettled, extracting }) {
   return (
     <>
-      {/* Chosen lines stack at top */}
-      <ChosenStack lines={lines} y={2.8} />
+      {/* Crossword grows as fragments are chosen */}
+      {placements && placements.length > 0 && (
+        <CrosswordView placements={placements} latestIndex={placements.length - 1} y={2} />
+      )}
+
+      {/* Chosen lines stack at top (hidden when crossword active) */}
+      {(!placements || placements.length === 0) && <ChosenStack lines={lines} y={2.8} />}
 
       {/* Superposition morph in center */}
       {(phase === 'reading' || phase === 'extracting') && currentRoundData && (
