@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import './App.css'
 import SuperpositionText from './SuperpositionText'
-import Crossword3D from './Crossword3D'
+import Crossword from './Crossword2D'
 import { buildSessionPairs } from './pairs'
 import { placeFragment } from './crosswordLayout'
 
@@ -85,7 +85,7 @@ function App() {
       {/* 3D crossword — constrained panel, slowly spinning */}
       {inSession && placements.length > 0 && (
         <div className={`crossword-panel ${phase === 'kept' ? 'is-fading' : ''}`}>
-          <Crossword3D placements={placements} latestIndex={placements.length - 1} frozen={phase === 'complete' || phase === 'kept'} />
+          <Crossword placements={placements} latestIndex={placements.length - 1} charSize={16} />
         </div>
       )}
 
