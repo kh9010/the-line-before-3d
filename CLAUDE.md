@@ -71,3 +71,12 @@ npx gh-pages -d dist
 ```
 
 Vite base path is set to `/the-line-before-3d/` for GitHub Pages.
+
+## Branch discipline
+
+**Always work on a personal/task-named branch.** Never commit directly to `main`. Never commit on someone else's branch (on joyus-website specifically, `designmay05` / `designmay06` etc. are Divya's). Pattern: `kahran-<task>`.
+
+- Before EVERY commit, verify with `git branch --show-current`. Claude Code sessions on this machine silently shift branches between turns — verify, don't assume.
+- If on `main` or a wrong branch, `git checkout` the correct branch FIRST.
+- After committing, push to `origin/<branch>`. Do not auto-merge to main. Wait for an explicit instruction like "merge to main" or "ship it."
+- When merging to main, use `git merge <branch> --no-ff`, then `git checkout` back to your branch.
