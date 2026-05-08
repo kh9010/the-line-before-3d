@@ -74,7 +74,7 @@ Vite base path is set to `/the-line-before-3d/` for GitHub Pages.
 
 ## Branch discipline
 
-**Always work on a personal/task-named branch.** Never commit directly to `main`. Never commit on someone else's branch (on joyus-website specifically, `designmay05` / `designmay06` etc. are Divya's). Pattern: `kahran-<task>`.
+**Always work on a personal/task-named branch.** Never commit directly to `main`. Never commit on someone else's branch (on joyus-website specifically, `designmay05` / `designmay06` etc. are Divya's). Pattern: **`kahran-<mmmDD>-<task>`** — lowercase month + zero-padded day + task, e.g. `kahran-may07-thesis-quiz`, `kahran-may08-claudemd-naming`. Date is required: Kahran often runs two parallel Claude Code sessions in different windows, and date-less names collide.
 
 - Before EVERY commit, verify with `git branch --show-current`. Claude Code sessions on this machine silently shift branches between turns — verify, don't assume.
 - If on `main` or a wrong branch, `git checkout` the correct branch FIRST.
