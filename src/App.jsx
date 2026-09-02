@@ -1,19 +1,21 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import './App.css'
 import SuperpositionText from './SuperpositionText'
-import Crossword from './Crossword2D'
-import { buildSessionPairs } from './pairs'
-import { placeFragment } from './crosswordLayout'
+import PoemLines from './PoemLines'
+import { buildSessionLines } from './pairs'
 
-const TOTAL_ROUNDS = 4
+// After the morph settles on a choice, how long the extraction plays in the
+// morph zone before the clause lands in the poem. Museum-paced: with up to
+// 10 presses per session, each beat stays brief.
+const EXTRACT_MS = 1500
 
 function App() {
   const [phase, setPhase] = useState('idle')
-  const [sessionPairs, setSessionPairs] = useState([])
-  const [currentRound, setCurrentRound] = useState(0)
+  const [sessionLines, setSessionLines] = useState([])
+  const [lineIdx, setLineIdx] = useState(0)
+  const [clauseIdx, setClauseIdx] = useState(0)
   const [chosenSide, setChosenSide] = useState(null)
-  const [lines, setLines] = useState([])
-  const [placements, setPlacements] = useState([])
+  const [poem, setPoem] = useState([])
   const [morphKey, setMorphKey] = useState(0)
   const timers = useRef([])
 
@@ -22,57 +24,72 @@ function App() {
 
   useEffect(() => () => clearTimers(), [])
 
-  const currentRoundData = sessionPairs[currentRound]
+  const currentLine = sessionLines[lineIdx]
+  const currentSlot = currentLine?.clauses[clauseIdx]
 
   const handleCreate = () => {
     clearTimers()
-    const pairs = buildSessionPairs()
-    if (pairs.length === 0) return
-    setSessionPairs(pairs)
-    setCurrentRound(0)
+    const lines = buildSessionLines()
+    if (lines.length === 0) return
+    setSessionLines(lines)
+    setLineIdx(0)
+    setClauseIdx(0)
     setChosenSide(null)
-    setLines([])
-    setPlacements([])
+    setPoem([])
     setMorphKey(k => k + 1)
     setPhase('reading')
   }
 
-  const handleChoice = (e, side) => {
-    if (!currentRoundData || chosenSide) return
-    const pick = side === 'A' ? currentRoundData.negPick : currentRoundData.posPick
+  const handleChoice = (side) => {
+    if (!currentSlot || chosenSide) return
+    const pick = side === 'A' ? currentSlot.negPick : currentSlot.posPick
     if (!pick || !pick.phrase) return
     setChosenSide(side)
   }
 
   const handleSettled = useCallback(() => {
-    if (!currentRoundData || !chosenSide) return
-    const pick = chosenSide === 'A' ? currentRoundData.negPick : currentRoundData.posPick
+    if (!currentSlot || !chosenSide) return
+    const pick = chosenSide === 'A' ? currentSlot.negPick : currentSlot.posPick
     if (!pick) return
-    const poleWord = currentRoundData.poles[chosenSide === 'A' ? 0 : 1]
-    const round = currentRound
+    const poleWord = currentLine.poles[chosenSide === 'A' ? 0 : 1]
+    const li = lineIdx
+    const ci = clauseIdx
     setPhase('extracting')
     addTimer(() => {
-      setLines(prev => [...prev, { text: pick.phrase.text, id: Date.now(), mode: poleWord }])
-      setPlacements(prev => placeFragment(prev, pick.phrase.text))
-      if (round < sessionPairs.length - 1) {
-        setCurrentRound(r => r + 1)
-        setChosenSide(null)
-        setMorphKey(k => k + 1)
-        setPhase('reading')
+      const clause = { id: `${li}-${ci}-${Date.now()}`, text: pick.phrase.text, pole: poleWord }
+      setPoem(prev => {
+        const next = [...prev]
+        const last = next[next.length - 1]
+        if (last && last.lineIdx === li) {
+          next[next.length - 1] = { ...last, clauses: [...last.clauses, clause] }
+        } else {
+          next.push({ id: `line-${li}`, lineIdx: li, clauses: [clause] })
+        }
+        return next
+      })
+      if (ci < currentLine.clauses.length - 1) {
+        setClauseIdx(ci + 1)
+      } else if (li < sessionLines.length - 1) {
+        setLineIdx(li + 1)
+        setClauseIdx(0)
       } else {
         setPhase('complete')
+        return
       }
-    }, 2200)
-  }, [currentRoundData, chosenSide, currentRound, sessionPairs.length])
+      setChosenSide(null)
+      setMorphKey(k => k + 1)
+      setPhase('reading')
+    }, EXTRACT_MS)
+  }, [currentSlot, currentLine, chosenSide, lineIdx, clauseIdx, sessionLines.length])
 
   const handleKeep = () => {
     setPhase('kept')
     addTimer(() => {
       clearTimers()
-      setLines([])
-      setPlacements([])
-      setSessionPairs([])
-      setCurrentRound(0)
+      setPoem([])
+      setSessionLines([])
+      setLineIdx(0)
+      setClauseIdx(0)
       setChosenSide(null)
       setPhase('idle')
     }, 3500)
@@ -82,20 +99,18 @@ function App() {
 
   return (
     <div className={`app phase-${phase}`}>
-      {/* 3D crossword — constrained panel, slowly spinning */}
-      {inSession && placements.length > 0 && (
-        <div className={`crossword-panel ${phase === 'kept' ? 'is-fading' : ''}`}>
-          <Crossword placements={placements} latestIndex={placements.length - 1} charSize={16} />
-        </div>
+      {/* The poem being co-created — clauses materialise in the style of their pole */}
+      {inSession && (
+        <PoemLines poem={poem} fading={phase === 'kept'} />
       )}
 
       {/* DOM: superposition morph text */}
       <div className="morph-zone">
-        {(phase === 'reading' || phase === 'extracting') && currentRoundData && (
+        {(phase === 'reading' || phase === 'extracting') && currentSlot && (
           <SuperpositionText
             key={morphKey}
-            contextA={currentRoundData.negPick.context}
-            contextB={currentRoundData.posPick.context}
+            contextA={currentSlot.negPick.context}
+            contextB={currentSlot.posPick.context}
             chosenSide={chosenSide}
             onSettled={handleSettled}
             extracting={phase === 'extracting'}
@@ -112,35 +127,24 @@ function App() {
         </div>
       )}
 
-      {/* Complete: the poem revealed */}
-      {phase === 'complete' && (
-        <div className="reveal">
-          {lines.map((line, i) => (
-            <p key={line.id} className="reveal-line" style={{ animationDelay: `${i * 0.4}s` }}>
-              {line.text.replace(/ \/ /g, '\n')}
-            </p>
-          ))}
-        </div>
-      )}
-
       {/* DOM: controls */}
       <div className="controls">
         {phase === 'idle' && null}
-        {phase === 'reading' && currentRoundData && (
+        {phase === 'reading' && currentLine && (
           <div className="choice-buttons">
             <button
               className={`btn-axis ${chosenSide === 'A' ? 'is-chosen' : ''}`}
-              onClick={(e) => handleChoice(e, 'A')}
+              onClick={() => handleChoice('A')}
               disabled={!!chosenSide}
             >
-              {currentRoundData.poles[0]}
+              {currentLine.poles[0]}
             </button>
             <button
               className={`btn-axis ${chosenSide === 'B' ? 'is-chosen' : ''}`}
-              onClick={(e) => handleChoice(e, 'B')}
+              onClick={() => handleChoice('B')}
               disabled={!!chosenSide}
             >
-              {currentRoundData.poles[1]}
+              {currentLine.poles[1]}
             </button>
           </div>
         )}
@@ -152,11 +156,23 @@ function App() {
         )}
       </div>
 
-      {/* Round dots */}
+      {/* Clause dots, grouped by line */}
       {inSession && phase !== 'kept' && (
         <div className="round-indicator">
-          {Array.from({ length: Math.min(TOTAL_ROUNDS, sessionPairs.length) }, (_, i) => (
-            <span key={i} className={`round-dot ${i < lines.length ? 'is-filled' : ''} ${i === lines.length ? 'is-current' : ''}`} />
+          {sessionLines.map((line, li) => (
+            <span key={li} className="dot-group">
+              {line.clauses.map((_, ci) => {
+                const done = phase === 'complete' ||
+                  li < lineIdx || (li === lineIdx && ci < clauseIdx)
+                const current = phase !== 'complete' && li === lineIdx && ci === clauseIdx
+                return (
+                  <span
+                    key={ci}
+                    className={`round-dot ${done ? 'is-filled' : ''} ${current ? 'is-current' : ''}`}
+                  />
+                )
+              })}
+            </span>
           ))}
         </div>
       )}

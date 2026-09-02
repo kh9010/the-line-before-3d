@@ -39,15 +39,17 @@ function pickForPole(axisIndex, sign, excludePhrases, excludeSources) {
   return weightedPick(candidates)
 }
 
+const AXIS_NAMES = [
+  ['sublimate', 'crystallise'],
+  ['grip', 'release'],
+  ['echo', 'ignite'],
+  ['smother', 'howl'],
+]
+
 // Build 4 pole-pairs for a session, one per axis, in a shuffled axis order.
 // Returns: [{ axisIndex, poles: [negWord, posWord], negPick, posPick }] × 4
 export function buildSessionPairs() {
-  const axisNames = [
-    ['sublimate', 'crystallise'],
-    ['grip', 'release'],
-    ['echo', 'ignite'],
-    ['smother', 'howl'],
-  ]
+  const axisNames = AXIS_NAMES
   const order = shuffle([0, 1, 2, 3])
   const usedPhrases = new Set()
   const usedSources = new Set()
@@ -74,4 +76,49 @@ export function buildSessionPairs() {
     })
   }
   return rounds
+}
+
+// Clause-session: 4 lines (one per axis, shuffled), each line carved into
+// clause slots. Every slot is its own pole-pair; each press extracts one
+// clause-sized fragment into the growing line, so a visitor can ignite,
+// ignite, then echo within the same line.
+const LINE_SHAPE = [3, 2, 3, 2]
+
+function pickForPoleRelaxed(axisIndex, sign, usedPhrases, usedSources) {
+  // Prefer an unused source poem; if the pool thins, allow source reuse.
+  return (
+    pickForPole(axisIndex, sign, usedPhrases, usedSources) ||
+    pickForPole(axisIndex, sign, usedPhrases, new Set())
+  )
+}
+
+// Returns: [{ axisIndex, poles: [negWord, posWord], clauses: [{ negPick, posPick }] }] × 4
+export function buildSessionLines() {
+  const order = shuffle([0, 1, 2, 3])
+  const usedPhrases = new Set()
+  const usedSources = new Set()
+  const lines = []
+
+  order.forEach((axisIndex, lineIdx) => {
+    const clauseCount = LINE_SHAPE[lineIdx % LINE_SHAPE.length]
+    const clauses = []
+    for (let c = 0; c < clauseCount; c++) {
+      const negPick = pickForPoleRelaxed(axisIndex, -1, usedPhrases, usedSources)
+      if (negPick) {
+        usedPhrases.add(negPick.phrase.text)
+        usedSources.add(negPick.context.sourceFile)
+      }
+      const posPick = pickForPoleRelaxed(axisIndex, +1, usedPhrases, usedSources)
+      if (posPick) {
+        usedPhrases.add(posPick.phrase.text)
+        usedSources.add(posPick.context.sourceFile)
+      }
+      if (!negPick || !posPick) continue
+      clauses.push({ negPick, posPick })
+    }
+    if (clauses.length > 0) {
+      lines.push({ axisIndex, poles: AXIS_NAMES[axisIndex], clauses })
+    }
+  })
+  return lines
 }

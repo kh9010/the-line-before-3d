@@ -57,6 +57,137 @@ body {
   100% { opacity: 1; transform: translateY(0) scale(1); }
 }
 
+/* Poem panel — the co-created poem, one line per axis */
+.poem-panel {
+  width: 100%;
+  max-width: 700px;
+  min-height: 3.5rem;
+  margin-bottom: 1.5rem;
+  text-align: center;
+  font-family: 'Courier New', monospace;
+  font-size: 1.05rem;
+  line-height: 2;
+  color: #1a1a1a;
+  transition: opacity 1.5s ease;
+}
+.poem-panel.is-fading { opacity: 0; }
+
+/* On complete, the poem is the reveal — let it breathe */
+.phase-complete .poem-panel {
+  font-size: 1.15rem;
+  transition: font-size 0.8s ease;
+}
+
+.poem-line { min-height: 2em; }
+
+.clause {
+  display: inline-block;
+  position: relative;
+  margin: 0 0.6ch;
+  white-space: nowrap;
+}
+
+.clause-char {
+  display: inline-block;
+  white-space: pre;
+  animation-fill-mode: both;
+}
+
+/* — sublimate: condenses out of air; blur sharpens, drifting down into place — */
+.mat-sublimate .clause-char {
+  animation: mat-sublimate 1.6s ease-out both;
+}
+@keyframes mat-sublimate {
+  0%   { opacity: 0; filter: blur(7px); transform: translateY(-14px); }
+  55%  { opacity: 0.7; filter: blur(2px); transform: translateY(-3px); }
+  100% { opacity: 1; filter: blur(0); transform: translateY(0); }
+}
+
+/* — crystallise: facets snap in, crisp, letter by letter — */
+.mat-crystallise .clause-char {
+  animation: mat-crystallise 0.3s cubic-bezier(0.2, 0.9, 0.1, 1) both;
+}
+@keyframes mat-crystallise {
+  0%   { opacity: 0; transform: scale(1.6); }
+  70%  { opacity: 1; transform: scale(0.95); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+/* — grip: chars pulled inward from outside, the clause clenches at once — */
+.mat-grip .clause-char {
+  animation: mat-grip 0.7s cubic-bezier(0.3, 0, 0.2, 1) both;
+}
+@keyframes mat-grip {
+  0%   { opacity: 0; transform: translateX(var(--dx, 0)) scaleX(1.25); }
+  60%  { opacity: 1; transform: translateX(calc(var(--dx, 0) * 0.08)) scaleX(0.94); }
+  100% { opacity: 1; transform: translateX(0) scaleX(1); }
+}
+
+/* — release: starts compressed at the centre, eases apart, rising slightly — */
+.mat-release .clause-char {
+  animation: mat-release 1.4s ease-out both;
+}
+@keyframes mat-release {
+  0%   { opacity: 0; transform: translateX(calc(var(--dx, 0) * -0.7)) translateY(4px); }
+  50%  { opacity: 0.8; }
+  100% { opacity: 1; transform: translateX(0) translateY(0); }
+}
+
+/* — echo: arrives with decaying afterimages, like reverb — */
+.mat-echo .clause-char {
+  animation: mat-echo 1.2s ease-in both;
+}
+@keyframes mat-echo {
+  0%   { opacity: 0; }
+  100% { opacity: 1; }
+}
+.clause-ghost {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  white-space: pre;
+  pointer-events: none;
+  opacity: 0;
+}
+.mat-echo .ghost-1 { animation: ghost-echo 1.5s ease-out 0.25s both; }
+.mat-echo .ghost-2 { animation: ghost-echo 1.8s ease-out 0.6s both; }
+@keyframes ghost-echo {
+  0%   { opacity: 0; transform: translateY(0); }
+  25%  { opacity: 0.4; }
+  100% { opacity: 0; transform: translateY(-11px); filter: blur(2px); }
+}
+
+/* — ignite: sparks catch in scattered order, ember cooling to ink — */
+.mat-ignite .clause-char {
+  animation: mat-ignite 0.9s ease-out both;
+}
+@keyframes mat-ignite {
+  0%   { opacity: 0; color: #c2591f; text-shadow: 0 0 12px rgba(220, 120, 40, 0.85); transform: scale(1.3); }
+  35%  { opacity: 1; color: #c2591f; text-shadow: 0 0 8px rgba(220, 120, 40, 0.6); transform: scale(1.05); }
+  100% { opacity: 1; color: #1a1a1a; text-shadow: none; transform: scale(1); }
+}
+
+/* — smother: rises pressed-flat from under a weight, muted, slow — */
+.mat-smother .clause-char {
+  animation: mat-smother 1.8s ease-out both;
+}
+@keyframes mat-smother {
+  0%   { opacity: 0; transform: scaleY(0.2) translateY(7px); color: #8a8a8a; }
+  65%  { opacity: 0.55; transform: scaleY(0.85) translateY(2px); color: #5a5a5a; }
+  100% { opacity: 1; transform: scaleY(1) translateY(0); color: #1a1a1a; }
+}
+
+/* — howl: bursts in oversized with a shake, settles — */
+.mat-howl .clause-char {
+  animation: mat-howl 0.5s cubic-bezier(0.2, 0.8, 0.3, 1.1) both;
+}
+@keyframes mat-howl {
+  0%   { opacity: 0; transform: scale(2.3) rotate(var(--rot, 0deg)); }
+  55%  { opacity: 1; transform: scale(0.9) rotate(calc(var(--rot, 0deg) * -0.4)); }
+  100% { opacity: 1; transform: scale(1) rotate(0deg); }
+}
+
 /* DOM morph zone */
 .morph-zone {
   width: 100%;
@@ -151,9 +282,12 @@ body {
 
 .status-text { font-size: 0.9rem; color: #888; letter-spacing: 0.1em; }
 
-/* Round dots */
+/* Clause dots, grouped by line */
 .round-indicator {
-  display: flex; justify-content: center; gap: 0.6rem;
+  display: flex; justify-content: center; gap: 1.1rem;
+}
+.dot-group {
+  display: flex; gap: 0.35rem;
 }
 .round-dot {
   width: 8px; height: 8px; border-radius: 50%;
