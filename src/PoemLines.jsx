@@ -6,8 +6,11 @@
 // smother rises pressed-flat from under a weight.
 
 
+import { useState, useEffect, useRef } from 'react'
+
+// Slashes and backslashes in fragment text are iA Writer export artifacts.
 function displayText(text) {
-  return text.replace(/ \/ /g, ' ')
+  return text.replace(/\s*[/\\]+\s*/g, ' ').trim()
 }
 
 // Per-character animation vars for each pole style.
@@ -42,14 +45,52 @@ function Clause({ clause }) {
   const words = text.split(' ')
   const len = text.length
   const mid = (len - 1) / 2
+  const ref = useRef(null)
+  // When the clause carries fromRect (where its fragment sat in the morph
+  // zone), a ghost of the text travels from there to its place in this poem;
+  // the pole materialisation plays as it lands. One continuous journey:
+  // out of the old poem, into this one.
+  const [landed, setLanded] = useState(!clause.fromRect)
+  useEffect(() => {
+    if (landed || !clause.fromRect) return
+    const el = ref.current
+    const target = el?.getBoundingClientRect()
+    if (!target || !target.width) {
+      const raf = requestAnimationFrame(() => setLanded(true))
+      return () => cancelAnimationFrame(raf)
+    }
+    const ghost = document.createElement('div')
+    ghost.className = 'travel-ghost'
+    ghost.textContent = displayText(clause.text)
+    ghost.style.left = `${target.left}px`
+    ghost.style.top = `${target.top}px`
+    document.body.appendChild(ghost)
+    const dx = clause.fromRect.left - target.left
+    const dy = clause.fromRect.top - target.top
+    const travel = ghost.animate(
+      [
+        { transform: `translate(${dx}px, ${dy}px)`, opacity: 0.95 },
+        { transform: 'translate(0, 0)', opacity: 1 },
+      ],
+      { duration: 750, easing: 'cubic-bezier(0.25, 0.6, 0.3, 1)' }
+    )
+    let done = false
+    travel.onfinish = () => {
+      if (done) return
+      setLanded(true)
+      const fade = ghost.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 320, fill: 'forwards' })
+      fade.onfinish = () => { done = true; ghost.remove() }
+    }
+    return () => { done = true; travel.cancel(); ghost.remove() }
+  }, [landed, clause])
   // Chars are grouped into word spans so a clause too wide for the screen
   // wraps at word boundaries, never mid-word. Delays still use the char's
   // index in the full clause so the timing reads as one gesture.
   const starts = []
   words.reduce((pos, word) => { starts.push(pos); return pos + word.length + 1 }, 0)
   return (
-    <span className={`clause mat-${clause.pole}`}>
-      {clause.pole === 'echo' && (
+    <span ref={ref} className={`clause mat-${clause.pole} ${landed ? '' : 'is-arriving'}`}>
+      {landed && clause.pole === 'echo' && (
         <>
           <span className="clause-ghost ghost-1" aria-hidden="true">{text}</span>
           <span className="clause-ghost ghost-2" aria-hidden="true">{text}</span>

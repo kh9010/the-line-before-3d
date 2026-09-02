@@ -87,6 +87,24 @@ body {
   max-width: 100%;
 }
 
+/* while the travel ghost is in flight, the clause holds its space unseen */
+.clause.is-arriving .clause-char {
+  animation: none;
+  opacity: 0;
+}
+
+/* the fragment's text in flight from the morph zone to its place in the poem */
+.travel-ghost {
+  position: fixed;
+  z-index: 10;
+  font-family: 'Courier New', monospace;
+  font-size: 1.05rem;
+  line-height: 2;
+  color: #1a1a1a;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
 /* words stay whole; an over-wide clause wraps at word boundaries */
 .clause-word {
   display: inline-block;
@@ -269,9 +287,21 @@ body {
 }
 .btn-main:hover { background: #1a1a1a; color: #f5f0e8; }
 
+.choice-column {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
 .choice-buttons { display: flex; gap: 2rem; }
 
+/* Hold-to-steer buttons. Ink rises in the held button as the wavefront is
+   pushed toward that poem — the fill IS the lean (--lean set per frame by
+   SuperpositionText on the document root). */
 .btn-axis {
+  position: relative;
+  overflow: hidden;
   font-family: 'Courier New', monospace;
   font-size: 1rem;
   padding: 0.5rem 1.6rem;
@@ -279,12 +309,38 @@ body {
   border: 1px solid #888;
   color: #555;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: border-color 0.2s ease, color 0.2s ease;
   letter-spacing: 0.08em;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  touch-action: none;
 }
+.btn-axis::after {
+  content: '';
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  height: 100%;
+  background: rgba(26, 26, 26, 0.14);
+  transform-origin: bottom;
+  transform: scaleY(0);
+  pointer-events: none;
+}
+.btn-axis.pole-a::after { transform: scaleY(clamp(0, calc(var(--lean, 0) * -1), 1)); }
+.btn-axis.pole-b::after { transform: scaleY(clamp(0, var(--lean, 0), 1)); }
 .btn-axis:hover:not(:disabled) { border-color: #1a1a1a; color: #1a1a1a; }
 .btn-axis:disabled { opacity: 0.4; cursor: default; }
-.btn-axis.is-chosen { border-color: #1a1a1a; color: #1a1a1a; }
+.btn-axis.is-held { border-color: #1a1a1a; color: #1a1a1a; }
+
+.steer-hint {
+  font-family: 'Courier New', monospace;
+  font-size: 0.75rem;
+  color: #aaa;
+  letter-spacing: 0.08em;
+  font-style: italic;
+  transition: opacity 0.6s ease;
+}
+.steer-hint.is-hidden { opacity: 0; }
 
 .status-text { font-size: 0.9rem; color: #888; letter-spacing: 0.1em; }
 

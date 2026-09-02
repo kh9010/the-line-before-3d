@@ -1,11 +1,22 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 
-// Timing (ms)
-const HOLD_MS = 2200
-const MORPH_MS = 1000
-const SETTLE_MS = 500  // when user picks, rapid settle to chosen side
+// Steering model: the two poems share the space, split by a scramble
+// wavefront. Holding a pole button pushes the front through the text toward
+// that poem — like leaning on a rudder — and holding it all the way to the
+// edge commits the choice. Releasing lets the front relax back to a slow
+// breathing drift around the midpoint.
+const STEER_RATE = 0.55        // lean units/sec while holding
+const RELAX_RATE = 1.1         // ease/sec back toward the breathing drift
+const BREATHE_AMPL = 0.22
+const BREATHE_PERIOD_MS = 7000
+const COMMIT_AT = 0.93         // |lean| needed to commit
+const COMMIT_DWELL_MS = 200    // held at the pole this long → committed
 
 const SCRAMBLE_CHARS = 'abcdefghijklmnopqrstuvwxyz .,'
+
+// iA Writer export artifacts — never show them. A space keeps every
+// fragmentCharRange index valid.
+const cleanLine = (s) => s.replace(/[/\\]/g, ' ')
 
 function buildAlignment(ctxA, ctxB) {
   const linesA = ctxA.contextLines
@@ -13,35 +24,33 @@ function buildAlignment(ctxA, ctxB) {
   const n = Math.max(linesA.length, linesB.length)
   const rows = []
   for (let i = 0; i < n; i++) {
-    const a = linesA[i] ?? ''
-    const b = linesB[i] ?? ''
+    const a = cleanLine(linesA[i] ?? '')
+    const b = cleanLine(linesB[i] ?? '')
     const len = Math.max(a.length, b.length)
     rows.push({ a: a.padEnd(len, ' '), b: b.padEnd(len, ' '), len })
   }
   return rows
 }
 
-function charAt(row, idx, dir, progress, waveWidth, totalChars, posOffset, scrambleRoll) {
-  const charIndex = posOffset + idx
-  const wavePos = progress * (totalChars + waveWidth) - waveWidth / 2
+// progress 0 → all poem A, 1 → all poem B; the wavefront scrambles the seam.
+function charAt(row, idx, progress, waveWidth, totalChars, posOffset, scrambleRoll) {
   const aCh = row.a[idx]
   const bCh = row.b[idx]
   if (aCh === bCh) return aCh
 
-  const ahead = dir === 'AtoB' ? aCh : bCh
-  const behind = dir === 'AtoB' ? bCh : aCh
-
+  const charIndex = posOffset + idx
+  const wavePos = progress * (totalChars + waveWidth) - waveWidth / 2
   const delta = charIndex - wavePos
-  if (delta < -waveWidth / 2) return behind
-  if (delta > waveWidth / 2) return ahead
-  // inside wave: scramble mix
+  if (delta < -waveWidth / 2) return bCh
+  if (delta > waveWidth / 2) return aCh
+  // inside the wavefront: scramble mix
   const r = (scrambleRoll + charIndex) % 7
-  if (r < 3) return ahead
-  if (r < 5) return behind
+  if (r < 3) return aCh
+  if (r < 5) return bCh
   return SCRAMBLE_CHARS[(scrambleRoll + charIndex * 31) % SCRAMBLE_CHARS.length]
 }
 
-export default function SuperpositionText({ contextA, contextB, chosenSide, onSettled, extracting }) {
+export default function SuperpositionText({ contextA, contextB, steer, chosenSide, onCommit, extracting }) {
   const chosenCtx = chosenSide === 'A' ? contextA : (chosenSide === 'B' ? contextB : null)
   const fragStart = chosenCtx?.fragmentLineIndex ?? -1
   const fragEnd = chosenCtx ? fragStart + chosenCtx.fragmentLineCount - 1 : -1
@@ -52,7 +61,6 @@ export default function SuperpositionText({ contextA, contextB, chosenSide, onSe
   )
 
   // Precompute per-char opacity based on distance to nearest fragment char (from either poem).
-  // Clear radius ~50 chars, fully faded by ~160.
   const opacityMap = useMemo(() => {
     const fragSet = new Set()
     const mark = (ctx, rowStart) => {
@@ -69,139 +77,105 @@ export default function SuperpositionText({ contextA, contextB, chosenSide, onSe
     }
     mark(contextA, contextA.fragmentLineIndex)
     mark(contextB, contextB.fragmentLineIndex)
-    // Build distance map via simple expand from fragment chars
     const N = totalChars
     const dist = new Array(N).fill(Infinity)
     for (const idx of fragSet) dist[idx] = 0
-    // Forward pass
     for (let i = 1; i < N; i++) {
       if (dist[i - 1] + 1 < dist[i]) dist[i] = dist[i - 1] + 1
     }
-    // Backward pass
     for (let i = N - 2; i >= 0; i--) {
       if (dist[i + 1] + 1 < dist[i]) dist[i] = dist[i + 1] + 1
     }
-    // Scale fog radii to text size — small poems fog proportionally rather than staying clear.
     const sizeFactor = Math.min(1, totalChars / 400)
     const CLEAR = 45 * sizeFactor
     const FADE_TO_ZERO = 170 * sizeFactor
     return dist.map(d => {
       if (d <= CLEAR) return 1
       if (d >= FADE_TO_ZERO) return 0
-      // Smoothstep from CLEAR → FADE_TO_ZERO
       const t = (d - CLEAR) / (FADE_TO_ZERO - CLEAR)
       return Math.max(0, 1 - t * t * (3 - 2 * t))
     })
   }, [alignment, contextA, contextB, totalChars])
 
-  const [tick, setTick] = useState(0)
+  // The rAF loop publishes each frame through state; refs hold only the
+  // loop's own continuity (previous lean, dwell timer, held direction).
+  const [frame, setFrame] = useState({ lean: 0, scramble: 0, settled: null })
 
-  // Refs hold mutable state the rAF loop reads
-  const phaseRef = useRef('holdA')
-  const progressRef = useRef(0)
-  const scrambleRef = useRef(0)
-  const phaseStartRef = useRef(performance.now())
-  const chosenRef = useRef(null)
-  const settledRef = useRef(false)
-  const onSettledRef = useRef(onSettled)
-  onSettledRef.current = onSettled
+  const leanRef = useRef(0)
+  const committedRef = useRef(false)
+  const dwellRef = useRef(0)
+  const steerRef = useRef(0)
+  const onCommitRef = useRef(onCommit)
+  useEffect(() => { onCommitRef.current = onCommit }, [onCommit])
+  useEffect(() => { steerRef.current = steer ?? 0 }, [steer])
 
-  // Keep chosenRef current
-  useEffect(() => { chosenRef.current = chosenSide }, [chosenSide])
-
-  // Single rAF loop
   useEffect(() => {
     let raf = 0
     let cancelled = false
+    let lastTime = performance.now()
     const loop = () => {
-      if (cancelled) return
+      if (cancelled || committedRef.current) return
       const now = performance.now()
-      const elapsed = now - phaseStartRef.current
-      let phase = phaseRef.current
+      const dt = Math.min(0.05, (now - lastTime) / 1000)
+      lastTime = now
+      const s = steerRef.current
+      let lean = leanRef.current
 
-      // Handle user choice → settle
-      if (chosenRef.current && !settledRef.current &&
-          phase !== 'settleToA' && phase !== 'settleToB' &&
-          phase !== 'settledA' && phase !== 'settledB') {
-        settledRef.current = true
-        const showing = (phase === 'holdB' || phase === 'morphToB') ? 'B' : 'A'
-        if (showing === chosenRef.current) {
-          phase = chosenRef.current === 'A' ? 'settledA' : 'settledB'
-          phaseRef.current = phase
-          progressRef.current = 0
-          setTick(t => t + 1)
-          if (onSettledRef.current) onSettledRef.current()
-          return  // stop loop
+      if (s !== 0) {
+        lean = Math.max(-1, Math.min(1, lean + s * STEER_RATE * dt))
+        if (lean * s >= COMMIT_AT) {
+          dwellRef.current += dt * 1000
+          if (dwellRef.current >= COMMIT_DWELL_MS) {
+            committedRef.current = true
+            leanRef.current = s
+            document.documentElement.style.setProperty('--lean', String(s))
+            setFrame({ lean: s, scramble: 0, settled: s > 0 ? 'B' : 'A' })
+            if (onCommitRef.current) onCommitRef.current(s > 0 ? 'B' : 'A')
+            return
+          }
         } else {
-          phase = chosenRef.current === 'B' ? 'settleToB' : 'settleToA'
-          phaseRef.current = phase
-          phaseStartRef.current = now
-          progressRef.current = 0
+          dwellRef.current = 0
         }
+      } else {
+        const breathe = Math.sin((now / BREATHE_PERIOD_MS) * Math.PI * 2) * BREATHE_AMPL
+        lean += (breathe - lean) * Math.min(1, RELAX_RATE * dt)
+        dwellRef.current = 0
       }
 
-      // Phase transitions
-      if (phase === 'settleToA' || phase === 'settleToB') {
-        const t = Math.min(1, elapsed / SETTLE_MS)
-        progressRef.current = t
-        scrambleRef.current = Math.floor(now / 40)
-        if (t >= 1) {
-          phaseRef.current = phase === 'settleToA' ? 'settledA' : 'settledB'
-          progressRef.current = 0
-          setTick(tick => tick + 1)
-          if (onSettledRef.current) onSettledRef.current()
-          return
-        }
-      } else if (phase === 'holdA' || phase === 'holdB') {
-        if (elapsed >= HOLD_MS) {
-          phaseRef.current = phase === 'holdA' ? 'morphToB' : 'morphToA'
-          phaseStartRef.current = now
-          progressRef.current = 0
-        }
-      } else if (phase === 'morphToB' || phase === 'morphToA') {
-        const t = Math.min(1, elapsed / MORPH_MS)
-        progressRef.current = t
-        scrambleRef.current = Math.floor(now / 40)
-        if (t >= 1) {
-          phaseRef.current = phase === 'morphToB' ? 'holdB' : 'holdA'
-          phaseStartRef.current = now
-          progressRef.current = 0
-        }
-      }
-
-      setTick(t => t + 1)
+      leanRef.current = lean
+      document.documentElement.style.setProperty('--lean', lean.toFixed(3))
+      setFrame({ lean, scramble: Math.floor(now / 40), settled: null })
       raf = requestAnimationFrame(loop)
     }
     raf = requestAnimationFrame(loop)
     return () => {
       cancelled = true
       if (raf) cancelAnimationFrame(raf)
+      document.documentElement.style.setProperty('--lean', '0')
     }
-  }, [alignment])  // restart only when input changes
+  }, [alignment])
 
-  // Render
-  const phase = phaseRef.current
-  const progress = progressRef.current
-  const scrambleRoll = scrambleRef.current
-  const waveWidth = Math.max(12, totalChars * 0.08)
+  // If chosenSide arrives from above, pin to the chosen poem.
+  const settledSide = chosenSide ?? frame.settled
+  const progress = (frame.lean + 1) / 2
+  const scrambleRoll = frame.scramble
+  const waveWidth = Math.max(14, totalChars * 0.1)
 
   // Bucket opacity into 8 levels, group consecutive same-bucket chars into spans.
   const bucket = (o) => Math.round(o * 7) / 7
-  let posOffset = 0
-  const rendered = alignment.map((row) => {
+  const rowOffsets = []
+  alignment.reduce((pos, row) => { rowOffsets.push(pos); return pos + row.len }, 0)
+  const rendered = alignment.map((row, ri) => {
+    const posOffset = rowOffsets[ri]
     const segments = []
     let curOpacity = null
     let curText = ''
     let joined = ''
     for (let i = 0; i < row.len; i++) {
       let ch
-      if (phase === 'holdA' || phase === 'settledA') ch = row.a[i]
-      else if (phase === 'holdB' || phase === 'settledB') ch = row.b[i]
-      else if (phase === 'morphToB' || phase === 'settleToB') {
-        ch = charAt(row, i, 'AtoB', progress, waveWidth, totalChars, posOffset, scrambleRoll)
-      } else {
-        ch = charAt(row, i, 'BtoA', progress, waveWidth, totalChars, posOffset, scrambleRoll)
-      }
+      if (settledSide === 'A') ch = row.a[i]
+      else if (settledSide === 'B') ch = row.b[i]
+      else ch = charAt(row, i, progress, waveWidth, totalChars, posOffset, scrambleRoll)
       joined += ch
       const charOpacity = bucket(opacityMap[posOffset + i] ?? 1)
       if (curOpacity === null) curOpacity = charOpacity
@@ -213,12 +187,9 @@ export default function SuperpositionText({ contextA, contextB, chosenSide, onSe
       curText += ch
     }
     if (curText) segments.push({ text: curText, opacity: curOpacity ?? 1 })
-    posOffset += row.len
     return { segments, joined }
   })
 
-  // Suppress unused-var lint on tick by reading it
-  void tick
 
   return (
     <div className={`superposition-text ${extracting ? 'is-extracting' : ''}`}>
@@ -226,22 +197,21 @@ export default function SuperpositionText({ contextA, contextB, chosenSide, onSe
         const line = row.joined
         const isFragmentLine = extracting && i >= fragStart && i <= fragEnd
         if (!extracting) {
-          // Reading / morph: render with fog-fade via opacity segments
           return (
             <div key={i} className="superposition-line">
-              {row.segments.length === 0 ? '\u00A0' : row.segments.map((seg, si) => (
+              {row.segments.length === 0 ? ' ' : row.segments.map((seg, si) => (
                 <span key={si} style={{ opacity: seg.opacity }}>{seg.text}</span>
               ))}
             </div>
           )
         }
         if (!isFragmentLine) {
-          return <div key={i} className="superposition-line is-dissolving">{line || '\u00A0'}</div>
+          return <div key={i} className="superposition-line is-dissolving">{line || ' '}</div>
         }
         const rangeIdx = i - fragStart
         const range = chosenCtx?.fragmentCharRanges?.[rangeIdx]
         if (!range) {
-          return <div key={i} className="superposition-line is-fragment">{line || '\u00A0'}</div>
+          return <div key={i} className="superposition-line is-fragment">{line || ' '}</div>
         }
         const [s, e] = range
         const pre = line.slice(0, s)
