@@ -7,12 +7,12 @@ import { useState, useEffect, useRef, useMemo } from 'react'
 // At rest the pair breathes: dominance drifts slowly from one poem to the
 // other. Holding a pole steers focus toward that poem; holding all the way
 // commits.
-const STEER_RATE = 0.7         // lean units/sec while holding
+const STEER_RATE = 1.15        // lean units/sec while holding
 const RELAX_RATE = 0.8         // ease/sec back toward the breathing drift
 const BREATHE_AMPL = 0.45
 const BREATHE_PERIOD_MS = 9000
 const COMMIT_AT = 0.93         // |lean| needed to commit
-const COMMIT_DWELL_MS = 250    // held at the pole this long → committed
+const COMMIT_DWELL_MS = 180    // held at the pole this long → committed
 
 // iA Writer export artifacts — never show them. A space keeps every
 // fragmentCharRange index valid.

@@ -82,7 +82,7 @@ export function buildSessionPairs() {
 // clause slots. Every slot is its own pole-pair; each press extracts one
 // clause-sized fragment into the growing line, so a visitor can ignite,
 // ignite, then echo within the same line.
-const LINE_SHAPE = [3, 2, 3, 2]
+const LINE_SHAPE = [3, 2, 2, 1]
 
 function pickForPoleRelaxed(axisIndex, sign, usedPhrases, usedSources) {
   // Prefer an unused source poem; if the pool thins, allow source reuse.

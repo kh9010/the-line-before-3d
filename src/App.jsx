@@ -6,7 +6,7 @@ import { buildSessionLines } from './pairs'
 
 // After a commit, how long the extraction plays in the morph zone before the
 // clause's ghost lifts out and travels to the poem.
-const EXTRACT_MS = 1100
+const EXTRACT_MS = 900
 
 function App() {
   const [phase, setPhase] = useState('idle')
