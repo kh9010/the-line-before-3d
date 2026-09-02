@@ -223,6 +223,17 @@ body {
   margin-bottom: 1.5rem;
 }
 
+/* Both poem layers occupy the same cell; lean pulls one into focus */
+.superposition-stack {
+  display: grid;
+  place-items: center;
+  width: 100%;
+}
+.superposition-stack > .superposition-text {
+  grid-area: 1 / 1;
+  will-change: opacity, filter, transform;
+}
+
 /* SuperpositionText styles (from DOM version) */
 .superposition-text {
   font-family: 'Courier New', monospace;
