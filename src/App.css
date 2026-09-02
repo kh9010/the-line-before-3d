@@ -84,7 +84,13 @@ body {
   display: inline-block;
   position: relative;
   margin: 0 0.6ch;
-  white-space: nowrap;
+  max-width: 100%;
+}
+
+/* words stay whole; an over-wide clause wraps at word boundaries */
+.clause-word {
+  display: inline-block;
+  white-space: pre;
 }
 
 .clause-char {
@@ -146,7 +152,7 @@ body {
   left: 0;
   top: 0;
   width: 100%;
-  white-space: pre;
+  white-space: normal;
   pointer-events: none;
   opacity: 0;
 }

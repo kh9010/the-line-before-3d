@@ -5,7 +5,6 @@
 // clenches inward, release drifts apart, crystallise snaps facet by facet,
 // smother rises pressed-flat from under a weight.
 
-const NBSP = '\u00A0'
 
 function displayText(text) {
   return text.replace(/ \/ /g, ' ')
@@ -40,8 +39,14 @@ function charStyle(pole, i, len, mid) {
 
 function Clause({ clause }) {
   const text = displayText(clause.text)
-  const chars = text.split('')
-  const mid = (chars.length - 1) / 2
+  const words = text.split(' ')
+  const len = text.length
+  const mid = (len - 1) / 2
+  // Chars are grouped into word spans so a clause too wide for the screen
+  // wraps at word boundaries, never mid-word. Delays still use the char's
+  // index in the full clause so the timing reads as one gesture.
+  const starts = []
+  words.reduce((pos, word) => { starts.push(pos); return pos + word.length + 1 }, 0)
   return (
     <span className={`clause mat-${clause.pole}`}>
       {clause.pole === 'echo' && (
@@ -50,11 +55,21 @@ function Clause({ clause }) {
           <span className="clause-ghost ghost-2" aria-hidden="true">{text}</span>
         </>
       )}
-      {chars.map((ch, i) => (
-        <span key={i} className="clause-char" style={charStyle(clause.pole, i, chars.length, mid)}>
-          {ch === ' ' ? NBSP : ch}
-        </span>
-      ))}
+      {words.map((word, wi) => {
+        const start = starts[wi]
+        return (
+          <span key={wi}>
+            <span className="clause-word">
+              {word.split('').map((ch, ci) => (
+                <span key={ci} className="clause-char" style={charStyle(clause.pole, start + ci, len, mid)}>
+                  {ch}
+                </span>
+              ))}
+            </span>
+            {wi < words.length - 1 && ' '}
+          </span>
+        )
+      })}
     </span>
   )
 }
