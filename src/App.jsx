@@ -45,7 +45,7 @@ function App() {
     if (!currentSlot || chosenSide) return
     const pick = side === 'A' ? currentSlot.negPick : currentSlot.posPick
     if (!pick || !pick.phrase) return
-    const poleWord = currentLine.poles[side === 'A' ? 0 : 1]
+    const poleWord = currentSlot.poles[side === 'A' ? 0 : 1]
     const li = lineIdx
     const ci = clauseIdx
     setChosenSide(side)
@@ -148,7 +148,7 @@ function App() {
       {/* DOM: controls */}
       <div className="controls">
         {phase === 'idle' && null}
-        {phase === 'reading' && currentLine && (
+        {phase === 'reading' && currentSlot && (
           <div className="choice-column">
             <div className="choice-buttons">
               <button
@@ -156,14 +156,14 @@ function App() {
                 disabled={!!chosenSide}
                 {...holdProps(-1)}
               >
-                {currentLine.poles[0]}
+                {currentSlot.poles[0]}
               </button>
               <button
                 className={`btn-axis pole-b ${steer === 1 ? 'is-held' : ''}`}
                 disabled={!!chosenSide}
                 {...holdProps(1)}
               >
-                {currentLine.poles[1]}
+                {currentSlot.poles[1]}
               </button>
             </div>
             <p className={`steer-hint ${firstClause ? '' : 'is-hidden'}`}>press and hold</p>

@@ -78,7 +78,7 @@ function Clause({ clause }) {
     travel.onfinish = () => {
       if (done) return
       setLanded(true)
-      const fade = ghost.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 320, fill: 'forwards' })
+      const fade = ghost.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 180, fill: 'forwards' })
       fade.onfinish = () => { done = true; ghost.remove() }
     }
     return () => { done = true; travel.cancel(); ghost.remove() }
@@ -88,8 +88,11 @@ function Clause({ clause }) {
   // index in the full clause so the timing reads as one gesture.
   const starts = []
   words.reduce((pos, word) => { starts.push(pos); return pos + word.length + 1 }, 0)
+  // A clause that travelled here lands and settles in its pole's character —
+  // full text from the first frame, no re-materialisation from nothing.
+  const phaseClass = landed ? (clause.fromRect ? 'did-travel' : '') : 'is-arriving'
   return (
-    <span ref={ref} className={`clause mat-${clause.pole} ${landed ? '' : 'is-arriving'}`}>
+    <span ref={ref} className={`clause mat-${clause.pole} ${phaseClass}`}>
       {landed && clause.pole === 'echo' && (
         <>
           <span className="clause-ghost ghost-1" aria-hidden="true">{text}</span>

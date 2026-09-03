@@ -78,11 +78,11 @@ export function buildSessionPairs() {
   return rounds
 }
 
-// Clause-session: 4 lines (one per axis, shuffled), each line carved into
-// clause slots. Every slot is its own pole-pair; each press extracts one
-// clause-sized fragment into the growing line, so a visitor can ignite,
-// ignite, then echo within the same line.
-const LINE_SHAPE = [3, 2, 2, 1]
+// Clause-session: 4 presses, one per axis (shuffled) so the pole words are
+// fresh on every press, laid out as lines of clause slots. Every slot is its
+// own pole-pair; each press extracts one clause-sized fragment into the
+// growing line.
+const LINE_SHAPE = [2, 2]
 
 function pickForPoleRelaxed(axisIndex, sign, usedPhrases, usedSources) {
   // Prefer an unused source poem; if the pool thins, allow source reuse.
@@ -92,17 +92,18 @@ function pickForPoleRelaxed(axisIndex, sign, usedPhrases, usedSources) {
   )
 }
 
-// Returns: [{ axisIndex, poles: [negWord, posWord], clauses: [{ negPick, posPick }] }] × 4
+// Returns: [{ clauses: [{ axisIndex, poles: [negWord, posWord], negPick, posPick }] }] per line
 export function buildSessionLines() {
   const order = shuffle([0, 1, 2, 3])
   const usedPhrases = new Set()
   const usedSources = new Set()
   const lines = []
+  let slot = 0
 
-  order.forEach((axisIndex, lineIdx) => {
-    const clauseCount = LINE_SHAPE[lineIdx % LINE_SHAPE.length]
+  for (const clauseCount of LINE_SHAPE) {
     const clauses = []
-    for (let c = 0; c < clauseCount; c++) {
+    for (let c = 0; c < clauseCount && slot < order.length; c++, slot++) {
+      const axisIndex = order[slot]
       const negPick = pickForPoleRelaxed(axisIndex, -1, usedPhrases, usedSources)
       if (negPick) {
         usedPhrases.add(negPick.phrase.text)
@@ -114,11 +115,11 @@ export function buildSessionLines() {
         usedSources.add(posPick.context.sourceFile)
       }
       if (!negPick || !posPick) continue
-      clauses.push({ negPick, posPick })
+      clauses.push({ axisIndex, poles: AXIS_NAMES[axisIndex], negPick, posPick })
     }
     if (clauses.length > 0) {
-      lines.push({ axisIndex, poles: AXIS_NAMES[axisIndex], clauses })
+      lines.push({ clauses })
     }
-  })
+  }
   return lines
 }
